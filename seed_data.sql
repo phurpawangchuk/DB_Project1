@@ -97,13 +97,14 @@ VALUES
     (11, 11, 1, null, null),
     (12, 12, 2, null, null),
     (13, 13, 3, null, null),
-    (14, 1, 8, 90, 'A'),
+    (14, 1, 8, 40, 'F'),
     (15, 1, 7, 85, 'B+'),
-    (16, 2, 3, 92, 'A'),
+    (16, 2, 3, 45, 'F'),
     (17, 2, 4, 88, 'B+'),
     (18, 5, 7, 95, 'A'),
     (19, 5, 6, 88, 'B+'),
     (20, 6, 8, 95, 'A');
+
 
 -- 10 records into the instructor table
 INSERT INTO instructor (instructorId, instructorName)
@@ -165,6 +166,3 @@ VALUES
     (18, 6, 8),
     (19, 7, 9),
     (20, 7, 10);
-
-course_assignment
-course_assignemt
