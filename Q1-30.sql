@@ -58,8 +58,32 @@
     2 rows in set (0.01 sec)
 
 -- 5) Retrieve the total number of students enrolled in a specific course.
+    SELECT courseName,count(*) as Total_std
+    FROM student s
+    INNER JOIN student_course sc ON sc.studentId=s.studentId
+    INNER JOIN course c ON c.courseId=sc.courseId
+    GROUP BY courseName;
+
+    +--------------------+-----------+
+    | courseName         | Total_std |
+    +--------------------+-----------+
+    | English Literature |         2 |
+    | Calculus           |         2 |
+    | Biology            |         3 |
+    | World History      |         2 |
+    | Computer Science   |         1 |
+    | Art Appreciation   |         2 |
+    | Music Theory       |         3 |
+    | Physics            |         3 |
+    | Geography          |         1 |
+    | Language Arts      |         1 |
+    +--------------------+-----------+
+    10 rows in set (0.02 sec)
 
 -- 6) Retrieve the list of all assignments for a specific course.
+    SELECT assignmentId,assignmentName,courseName
+    FROM assignment a
+    INNER JOIN assi
 -- 7) Retrieve the highest grade received by a specific student in a specific course.
 -- 8) Retrieve the list of all students who have not completed a specific assignment.
 -- 9) Retrieve the list of all courses that have more than 50 students enrolled.

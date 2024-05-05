@@ -37,6 +37,15 @@ CREATE TABLE course (
   PRIMARY KEY(courseId)
 );
 
+CREATE TABLE course_assignment (
+    id int not null UNIQUE,
+    courseId int,
+    assignmentId int,
+    PRIMARY KEY(courseId,assignmentId),
+    FOREIGN KEY(courseId) REFERENCES course(courseId),
+    FOREIGN KEY(assignmentId) REFERENCES assignment(assignmentId)
+);
+
 CREATE TABLE student_course (
     id int not null,
     studentId int,
