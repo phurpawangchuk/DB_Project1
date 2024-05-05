@@ -1,5 +1,43 @@
-
 -- 31) Retrieve the list of students who have submitted all assignments for a specific course.
+WITH course_assignments AS (
+    SELECT
+        ca.assignmentId
+    FROM
+        course_assignment ca
+    WHERE
+        ca.courseId = 1
+),
+assignment_count AS (
+    SELECT
+        COUNT(*) AS total_assignments
+    FROM
+        course_assignments
+),
+student_submissions AS (
+    SELECT
+        sa.studentId,
+        COUNT(sa.assignmentId) AS submitted_assignments
+    FROM
+        student_assignment sa
+        JOIN course_assignments ca ON sa.assignmentId = ca.assignmentId
+    GROUP BY
+        sa.studentId
+),
+students_fulfilled AS (
+    SELECT
+        ss.studentId
+    FROM
+        student_submissions ss
+        JOIN assignment_count ac ON ss.submitted_assignments = ac.total_assignments
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    s.email
+FROM
+    students_fulfilled sf
+    JOIN student s ON sf.studentId = s.studentId;
+
 -- 32) Retrieve the list of courses that have at least one assignment that no student has submitted.
 -- 33) Retrieve the list of students who have submitted the most assignments.
 -- 34) Retrieve the list of courses that have the highest average grade among students who have
