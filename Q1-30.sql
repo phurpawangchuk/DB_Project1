@@ -58,6 +58,7 @@
     2 rows in set (0.01 sec)
 
 -- 5) Retrieve the total number of students enrolled in a specific course.
+
 -- 6) Retrieve the list of all assignments for a specific course.
 -- 7) Retrieve the highest grade received by a specific student in a specific course.
 -- 8) Retrieve the list of all students who have not completed a specific assignment.
