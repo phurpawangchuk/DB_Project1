@@ -7,7 +7,6 @@ CREATE TABLE student(
     PRIMARY KEY(studentId)
 );
 
-
 CREATE TABLE assignment (
     assignmentId int not null,
     assign_due_date date,
@@ -24,24 +23,23 @@ CREATE TABLE student_assignment (
     assignment_graded_date date,
     assignment_returned_date date,
     studentId int,
-    PRIMARY KEY(assignmentId,studentId),
+    PRIMARY KEY(assignmentId, studentId),
     FOREIGN KEY(studentId) REFERENCES student(studentId),
     FOREIGN KEY(assignmentId) REFERENCES assignment(assignmentId)
 );
 
-
 CREATE TABLE course (
-  courseId int not null,
-  courseCode varchar(50),
-  courseName varchar(255),
-  PRIMARY KEY(courseId)
+    courseId int not null,
+    courseCode varchar(50),
+    courseName varchar(255),
+    PRIMARY KEY(courseId)
 );
 
 CREATE TABLE course_assignment (
     id int not null UNIQUE,
     courseId int,
     assignmentId int,
-    PRIMARY KEY(courseId,assignmentId),
+    PRIMARY KEY(courseId, assignmentId),
     FOREIGN KEY(courseId) REFERENCES course(courseId),
     FOREIGN KEY(assignmentId) REFERENCES assignment(assignmentId)
 );
@@ -52,7 +50,7 @@ CREATE TABLE student_course (
     courseId int,
     stdcourse_numeric_grade int,
     stdcourse_letter_grade varchar(2),
-    PRIMARY KEY(studentId,courseId),
+    PRIMARY KEY(studentId, courseId),
     FOREIGN KEY(studentId) REFERENCES student(studentId),
     FOREIGN KEY(courseId) REFERENCES course(courseId)
 );
