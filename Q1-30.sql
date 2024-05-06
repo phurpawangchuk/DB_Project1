@@ -246,23 +246,49 @@
 
 
 -- 15) Retrieve the instructor with the highest overall average grade for all courses they teach.
-SELECT instructorName
-FROM instructor i
-INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
-INNER JOIN course c ON c.courseId=ci.courseId
-
-SELECT c.courseId
-    FROM instructor i
-    INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
-    INNER JOIN course c ON c.courseId=ci.courseId
-
-    SELECT courseId,
-    FROM student_course sc
-    GROUP BY courseId
-
-
-
-
+    SELECT i.instructorId, max(avgGrade) as highestAvgGrade
+    FROM
+        instructor i
+    INNER JOIN
+    (
+        SELECT t1.courseId, t2.instructorId, avg(t1.stdcourse_numeric_grade) as avgGrade
+        FROM (
+                 SELECT courseId, stdcourse_numeric_grade
+                 FROM student_course sc
+                 WHERE stdcourse_numeric_grade IS NOT NULL
+                   AND courseId IN (
+                      SELECT c.courseId
+                      FROM instructor i
+                      INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
+                      INNER JOIN course c ON c.courseId = ci.courseId
+                 )
+             ) t1
+        INNER JOIN (
+            SELECT c.courseId, i.instructorId
+            FROM instructor i
+            INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
+            INNER JOIN course c ON c.courseId = ci.courseId
+        ) t2
+        ON t1.courseId = t2.courseId
+        GROUP BY t1.courseId, t2.instructorId
+    ) t3
+    ON t3.instructorId = i.instructorId
+    GROUP BY t3.instructorId
+    +--------------+-----------------+
+    | instructorId | highestAvgGrade |
+    +--------------+-----------------+
+    |            1 |         90.0000 |
+    |            2 |         90.0000 |
+    |            3 |         68.5000 |
+    |            4 |         88.0000 |
+    |            5 |         95.0000 |
+    |            6 |         95.0000 |
+    |            7 |         90.0000 |
+    |            8 |         90.0000 |
+    |            9 |         87.0000 |
+    |           10 |         93.0000 |
+    +--------------+-----------------+
+    10 rows in set (0.01 sec)
 
 -- 16) Retrieve the list of students who have a grade of A in a specific course.
     SELECT studentName,stdcourse_letter_grade as Grade
@@ -321,6 +347,7 @@ SELECT c.courseId
     10 rows in set (0.00 sec)
 
 -- 19) Retrieve the list of assignments that have the lowest average grade in a specific course.
+
     SELECT sa.assignmentId, min(assignment_numeric_grade) as minGrade
     FROM assignment a
     INNER JOIN student_assignment sa ON sa.assignmentId=a.assignmentId
@@ -332,24 +359,30 @@ SELECT c.courseId
         INNER JOIN assignment a ON a.assignmentId=sa.assignmentId
         INNER JOIN student_course sc ON sc.studentId=s.studentId
         INNER JOIN course c ON c.courseId = sc.courseId
-        WHERE c.courseId=1
+        WHERE c.courseId =2
     )
-   ???
+
 
 -- 20) Retrieve the list of students who have not enrolled in any course.
     SELECT s.studentName
     FROM student s
-    LEFT JOIN student_course sc ON s.studentId = sc.studentId
-    WHERE sc.studentId IS NULL;
+    WHERE studentId NOT IN (
+        SELECT studentId
+        FROM student_course
+    );
+
     +------------------+
     | studentName      |
     +------------------+
-    | Sophia Rodriguez |
     | Phurpa Wangchuk  |
     | Dann Astony      |
     | Marc Kuty        |
     +------------------+
-    4 rows in set (0.00 sec)
+    3 rows in set (0.00 sec)
+
+SELECT *
+FROM student s
+         LEFT JOIN student_course sc ON s.studentId = sc.studentId
 
 -- 21) Retrieve the list of instructors who are teaching more than one course.
     SELECT i.instructorName,i.instructorId,count(*) as courseCount
@@ -406,6 +439,9 @@ SELECT c.courseId
     | Calculus           |     85.0000 |
     +--------------------+-------------+
     10 rows in set (0.00 sec)
+
+select * from student_course
+
 -- 24) Retrieve the list of assignments that have a grade average higher than the overall grade average.
     SELECT assignmentId, avg(assignment_numeric_grade) as Grade
     FROM student_assignment
