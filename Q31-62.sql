@@ -194,21 +194,206 @@ WHERE
     );
 
 -- 37) Retrieve the list of assignments that have the lowest submission rate.
+-- Get the total number of students associated with each assignment through their courses
+WITH total_assignments AS (
+    SELECT
+        ca.assignmentId,
+        COUNT(sc.studentId) AS total_students
+    FROM
+        course_assignment ca
+        JOIN student_course sc ON ca.courseId = sc.courseId
+    GROUP BY
+        ca.assignmentId
+),
+-- Count the number of submissions for each assignment
+submission_counts AS (
+    SELECT
+        sa.assignmentId,
+        COUNT(*) AS submission_count
+    FROM
+        student_assignment sa
+    WHERE
+        sa.assignment_submission_date IS NOT NULL
+    GROUP BY
+        sa.assignmentId
+),
+-- Calculate the submission rate per assignment
+submission_rate AS (
+    SELECT
+        ta.assignmentId,
+        ta.total_students,
+        COALESCE(sc.submission_count, 0) AS submission_count,
+        (
+            COALESCE(sc.submission_count, 0) * 1.0 / ta.total_students
+        ) AS submission_rate
+    FROM
+        total_assignments ta
+        LEFT JOIN submission_counts sc ON ta.assignmentId = sc.assignmentId
+) -- Retrieve the assignments with the lowest submission rate
 SELECT
-    sa.assignmentId,
-    COUNT(*) AS submission_count
+    sr.assignmentId,
+    sr.total_students,
+    sr.submission_count,
+    sr.submission_rate
 FROM
-    student_assignment sa
+    submission_rate sr
 WHERE
-    sa.assignment_submission_date IS NOT NULL
-GROUP BY
-    sa.assignmentId;
+    sr.submission_rate = (
+        SELECT
+            MIN(submission_rate)
+        FROM
+            submission_rate
+    );
 
 -- 38) Retrieve the list of students who have the highest average grade for a specific course.
+WITH student_avg_grade AS (
+    SELECT
+        sc.studentId,
+        sc.stdcourse_letter_grade,
+        AVG(sc.stdcourse_numeric_grade) AS avg_grade
+    FROM
+        student_course sc
+        JOIN course c ON c.courseId = sc.courseId
+    WHERE
+        c.courseId = 1
+    GROUP BY
+        sc.studentId,
+        sc.stdcourse_letter_grade
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    sag.stdcourse_letter_grade,
+    sag.avg_grade
+FROM
+    student_avg_grade sag
+    JOIN student s ON s.studentId = sag.studentId
+WHERE
+    sag.avg_grade = (
+        SELECT
+            MAX(avg_grade)
+        FROM
+            student_avg_grade
+    );
+
 -- 39) Retrieve the list of courses with the highest percentage of students who have completed all
 -- assignments.
+WITH course_assignments AS (
+    SELECT
+        ca.courseId,
+        ca.assignmentId
+    FROM
+        course_assignment ca
+),
+assignment_count AS (
+    SELECT
+        ca.courseId,
+        COUNT(*) AS total_assignments
+    FROM
+        course_assignments ca
+    GROUP BY
+        ca.courseId
+),
+-- Count the number of assignments each student submitted per course
+student_submissions AS (
+    SELECT
+        sc.courseId,
+        sc.studentId,
+        COUNT(sa.assignmentId) AS submitted_assignments
+    FROM
+        student_course sc
+        LEFT JOIN student_assignment sa ON sc.studentId = sa.studentId
+        JOIN course_assignment ca ON sa.assignmentId = ca.assignmentId
+        AND ca.courseId = sc.courseId
+    GROUP BY
+        sc.courseId,
+        sc.studentId
+),
+-- Identify students who completed all assignments for each course
+students_fulfilled AS (
+    SELECT
+        ss.courseId,
+        COUNT(ss.studentId) AS completed_students
+    FROM
+        student_submissions ss
+        JOIN assignment_count ac ON ss.courseId = ac.courseId
+        AND ss.submitted_assignments = ac.total_assignments
+    GROUP BY
+        ss.courseId
+),
+completion_rate AS (
+    SELECT
+        sf.courseId,
+        sf.completed_students,
+        COUNT(sc.studentId) AS total_students,
+        (
+            sf.completed_students * 100.0 / COUNT(sc.studentId)
+        ) AS completion_percentage
+    FROM
+        students_fulfilled sf
+        JOIN student_course sc ON sc.courseId = sf.courseId
+    GROUP BY
+        sf.courseId
+) -- Retrieve courses with the highest completion percentage
+SELECT
+    cr.courseId,
+    cr.completion_percentage,
+    c.courseCode,
+    c.courseName
+FROM
+    completion_rate cr
+    JOIN course c ON c.courseId = cr.courseId
+WHERE
+    cr.completion_percentage = (
+        SELECT
+            MAX(completion_percentage)
+        FROM
+            completion_rate
+    );
+
 -- 40) Retrieve the list of students who have not submitted any assignments for a specific course.
+SELECT
+    sc.studentId,
+    s.studentName
+FROM
+    student_course sc
+    LEFT JOIN student_assignment sa ON sc.studentId = sa.studentId
+    LEFT JOIN course_assignment ca ON sc.courseId = ca.courseId
+    AND sa.assignmentId = ca.assignmentId
+    LEFT JOIN student s ON sc.studentId = s.studentId
+WHERE
+    sc.courseId = 4
+    AND sa.assignmentId IS NULL;
+
 -- 41) Retrieve the list of courses with the lowest average grade.
+WITH student_avg_grade AS (
+    SELECT
+        c.courseId,
+        sc.stdcourse_letter_grade,
+        AVG(sc.stdcourse_numeric_grade) AS avg_grade
+    FROM
+        student_course sc
+        JOIN course c ON c.courseId = sc.courseId
+    GROUP BY
+        sc.courseId,
+        sc.stdcourse_letter_grade
+)
+SELECT
+    c.courseId,
+    c.courseName,
+    sag.stdcourse_letter_grade,
+    sag.avg_grade
+FROM
+    student_avg_grade sag
+    JOIN course c ON c.courseId = sag.courseId
+WHERE
+    sag.avg_grade = (
+        SELECT
+            MAX(avg_grade)
+        FROM
+            student_avg_grade
+    );
+
 -- 42) Retrieve the list of assignments that have the highest average grade.
 -- 43) Retrieve the list of students who have the highest overall grade across all courses.
 -- 44) Retrieve the list of assignments that have not been graded yet.
