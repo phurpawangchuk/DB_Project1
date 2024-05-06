@@ -261,9 +261,6 @@ SELECT c.courseId
     GROUP BY courseId
 
 
-
-
-
 -- 16) Retrieve the list of students who have a grade of A in a specific course.
     SELECT studentName,stdcourse_letter_grade as Grade
     FROM student s
@@ -296,14 +293,12 @@ SELECT c.courseId
         +----------+---------------+
         3 rows in set (0.00 sec)
 
-
 -- 18) Retrieve the list of students who have the highest grade in a specific course.
     SELECT studentName, max(stdcourse_numeric_grade) as HighestGrade
     FROM student s
     INNER JOIN  student_course sc ON sc.studentId=s.studentId
     INNER JOIN course c ON c.courseId=sc.courseId
     GROUP BY studentName
-
     +------------------+--------------+
     | studentName      | HighestGrade |
     +------------------+--------------+
@@ -406,6 +401,7 @@ SELECT c.courseId
     | Calculus           |     85.0000 |
     +--------------------+-------------+
     10 rows in set (0.00 sec)
+
 -- 24) Retrieve the list of assignments that have a grade average higher than the overall grade average.
     SELECT assignmentId, avg(assignment_numeric_grade) as Grade
     FROM student_assignment
