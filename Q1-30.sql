@@ -246,16 +246,23 @@
 
 
 -- 15) Retrieve the instructor with the highest overall average grade for all courses they teach.
---     SELECT courseId, max(stdcourse_numeric_grade) as maxGrade
---     FROM student_course sc
---
---     GROUP BY courseId
---     HAVING maxGrade = (
---                 SELECT avg(stdcourse_numeric_grade)
---                 FROM student_course sc1
---                 WHERE sc.courseId = sc1.courseId
---                 GROUP BY courseId
---                );
+SELECT instructorName
+FROM instructor i
+INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
+INNER JOIN course c ON c.courseId=ci.courseId
+
+SELECT c.courseId
+    FROM instructor i
+    INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
+    INNER JOIN course c ON c.courseId=ci.courseId
+
+    SELECT courseId,
+    FROM student_course sc
+    GROUP BY courseId
+
+
+
+
 
 -- 16) Retrieve the list of students who have a grade of A in a specific course.
     SELECT studentName,stdcourse_letter_grade as Grade

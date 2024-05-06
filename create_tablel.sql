@@ -24,7 +24,7 @@ CREATE TABLE student_assignment (
     assignment_graded_date date,
     assignment_returned_date date,
     studentId int,
-    PRIMARY KEY(assignmentId),
+    PRIMARY KEY(assignmentId,studentId),
     FOREIGN KEY(studentId) REFERENCES student(studentId),
     FOREIGN KEY(assignmentId) REFERENCES assignment(assignmentId)
 );
