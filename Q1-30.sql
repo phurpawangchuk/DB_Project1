@@ -431,11 +431,87 @@
     17 rows in set (0.00 sec)
 
 -- 25) Retrieve the list of courses that have at least one student with a grade of F.
-    SELECT count(*)
-    FROM student_course
+    SELECT courseName
+    FROM course c
+    INNER JOIN student_course sc ON sc.courseId=c.courseId
+    WHERE stdcourse_letter_grade='F'
+    +------------+
+    | courseName |
+    +------------+
+    | Physics    |
+    | Biology    |
+    +------------+
+    2 rows in set (0.01 sec)
 
 -- 26) Retrieve the list of students who have the same grade in all their courses.
+    SELECT studentName, count(DISTINCT sc.stdcourse_letter_grade) as gradeCount
+    FROM student s
+    INNER JOIN student_course sc ON s.studentId = sc.studentId
+    GROUP BY studentName
+    HAVING COUNT(DISTINCT sc.stdcourse_letter_grade) = 1;
+    +------------------+
+    | studentName      |
+    +------------------+
+    | Bob Johnson      |
+    | Emma Brown       |
+    | Ryan Martinez    |
+    | Olivia Taylor    |
+    | David White      |
+    | Sophia Rodriguez |
+    +------------------+
+    6 rows in set (0.01 sec)
+
 -- 27) Retrieve the list of courses that have the same number of enrolled students.
+    SELECT c.courseName,count(sc.courseId) as Total_Std_Enrolled
+    FROM course c
+    INNER JOIN student_course sc ON c.courseId = sc.courseId
+    GROUP BY c.courseName
+    HAVING Total_Std_Enrolled = (
+            SELECT count(DISTINCT studentId) as stdCount
+            FROM student_course
+            GROUP BY courseId
+            LIMIT 1
+        );
+    +--------------------+--------------------+
+    | courseName         | Total_Std_Enrolled |
+    +--------------------+--------------------+
+    | English Literature |                  2 |
+    | Calculus           |                  2 |
+    | World History      |                  2 |
+    | Art Appreciation   |                  2 |
+    +--------------------+--------------------+
+    4 rows in set (0.00 sec)
+
 -- 28) Retrieve the list of instructors who have taught all courses.
+    SELECT instructorName
+    FROM instructor i
+    WHERE instructorId IN (
+            SELECT i.instructorId
+            FROM instructor i
+            INNER JOIN course_instructor ci ON ci.instructorId=i.instructorId
+            INNER JOIN course c ON c.courseId=ci.courseId
+        )
+    +-----------------+
+    | instructorName  |
+    +-----------------+
+    | Prof. Smith     |
+    | Dr. Johnson     |
+    | Ms. Williams    |
+    | Mr. Brown       |
+    | Prof. Davis     |
+    | Dr. Martinez    |
+    | Ms. Taylor      |
+    | Mr. White       |
+    | Prof. Rodriguez |
+    | Dr. Wilson      |
+    +-----------------+
+    10 rows in set (0.02 sec)
+
+
 -- 29) Retrieve the list of assignments that have been graded but not returned to the students.
+    SELECT sa.assignmentId
+    FROM assignment a
+    INNER JOIN student_assignment sa ON sa.assignmentId=a.assignmentId
+    WHERE assignment_graded_date is not null and assignment_returned_date is null;
+
 -- 30) Retrieve the list of courses that have an average grade higher than the overall grade average.
