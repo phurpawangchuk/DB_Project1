@@ -246,6 +246,7 @@
 
 
 -- 15) Retrieve the instructor with the highest overall average grade for all courses they teach.
+<<<<<<< HEAD
     SELECT i.instructorId, max(avgGrade) as highestAvgGrade
     FROM
         instructor i
@@ -289,6 +290,22 @@
     |           10 |         93.0000 |
     +--------------+-----------------+
     10 rows in set (0.01 sec)
+=======
+SELECT instructorName
+FROM instructor i
+INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
+INNER JOIN course c ON c.courseId=ci.courseId
+
+SELECT c.courseId
+    FROM instructor i
+    INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
+    INNER JOIN course c ON c.courseId=ci.courseId
+
+    SELECT courseId,
+    FROM student_course sc
+    GROUP BY courseId
+
+>>>>>>> feat/Q31-62
 
 -- 16) Retrieve the list of students who have a grade of A in a specific course.
     SELECT studentName,stdcourse_letter_grade as Grade
@@ -328,7 +345,6 @@
     INNER JOIN  student_course sc ON sc.studentId=s.studentId
     INNER JOIN course c ON c.courseId=sc.courseId
     GROUP BY studentName
-
     +------------------+--------------+
     | studentName      | HighestGrade |
     +------------------+--------------+
@@ -439,8 +455,11 @@ FROM student s
     +--------------------+-------------+
     10 rows in set (0.00 sec)
 
+<<<<<<< HEAD
 select * from student_course
 
+=======
+>>>>>>> feat/Q31-62
 -- 24) Retrieve the list of assignments that have a grade average higher than the overall grade average.
     SELECT assignmentId, avg(assignment_numeric_grade) as Grade
     FROM student_assignment
