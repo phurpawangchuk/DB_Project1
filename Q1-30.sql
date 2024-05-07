@@ -246,7 +246,6 @@
 
 
 -- 15) Retrieve the instructor with the highest overall average grade for all courses they teach.
-<<<<<<< HEAD
     SELECT i.instructorId, max(avgGrade) as highestAvgGrade
     FROM
         instructor i
@@ -290,22 +289,6 @@
     |           10 |         93.0000 |
     +--------------+-----------------+
     10 rows in set (0.01 sec)
-=======
-SELECT instructorName
-FROM instructor i
-INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
-INNER JOIN course c ON c.courseId=ci.courseId
-
-SELECT c.courseId
-    FROM instructor i
-    INNER JOIN course_instructor ci ON ci.instructorId = i.instructorId
-    INNER JOIN course c ON c.courseId=ci.courseId
-
-    SELECT courseId,
-    FROM student_course sc
-    GROUP BY courseId
-
->>>>>>> feat/Q31-62
 
 -- 16) Retrieve the list of students who have a grade of A in a specific course.
     SELECT studentName,stdcourse_letter_grade as Grade
@@ -434,32 +417,31 @@ FROM student s
     3 rows in set (0.00 sec)
 
 -- 23) Retrieve the list of courses that have the highest average grade.
-    SELECT courseName, avg(stdcourse_numeric_grade) as maxAvgGrade
-    FROM course c
-    INNER JOIN student_course sc ON sc.courseId=c.courseId
-    GROUP BY courseName
-    ORDER BY maxAvgGrade DESC;
-    +--------------------+-------------+
-    | courseName         | maxAvgGrade |
-    +--------------------+-------------+
-    | Computer Science   |     95.0000 |
-    | Physics            |     93.0000 |
-    | Language Arts      |     93.0000 |
-    | Biology            |     92.0000 |
-    | English Literature |     90.0000 |
-    | Music Theory       |     90.0000 |
-    | World History      |     88.0000 |
-    | Geography          |     87.0000 |
-    | Art Appreciation   |     86.5000 |
-    | Calculus           |     85.0000 |
-    +--------------------+-------------+
-    10 rows in set (0.00 sec)
 
-<<<<<<< HEAD
-select * from student_course
+    WITH course_with_highest_grade AS (
+            SELECT courseId, max(stdcourse_numeric_grade) as higestAvgGrade
+            FROM student_course
+            GROUP BY courseId
+        ),
+        course_average_grade AS (
+            SELECT courseId, avg(stdcourse_numeric_grade) as avgGrade
+            FROM student_course
+            GROUP BY courseId
+        )
+        SELECT c.courseName, ch.higestAvgGrade, ca.avgGrade
+        FROM course c
+        JOIN course_with_highest_grade ch ON ch.courseId=c.courseId
+        JOIN course_average_grade ca ON ca.courseId=ch.courseId AND ca.avgGrade < ch.higestAvgGrade
+        +------------------+----------------+----------+
+        | courseName       | higestAvgGrade | avgGrade |
+        +------------------+----------------+----------+
+        | Biology          |             92 |  68.5000 |
+        | Art Appreciation |             88 |  86.5000 |
+        | Music Theory     |             95 |  90.0000 |
+        | Physics          |             95 |  76.3333 |
+        +------------------+----------------+----------+
+        4 rows in set (0.00 sec)
 
-=======
->>>>>>> feat/Q31-62
 -- 24) Retrieve the list of assignments that have a grade average higher than the overall grade average.
     SELECT assignmentId, avg(assignment_numeric_grade) as Grade
     FROM student_assignment
@@ -505,69 +487,125 @@ select * from student_course
     2 rows in set (0.01 sec)
 
 -- 26) Retrieve the list of students who have the same grade in all their courses.
-    SELECT studentName, count(DISTINCT sc.stdcourse_letter_grade) as gradeCount
-    FROM student s
-    INNER JOIN student_course sc ON s.studentId = sc.studentId
-    GROUP BY studentName
-    HAVING COUNT(DISTINCT sc.stdcourse_letter_grade) = 1;
-    +------------------+
-    | studentName      |
-    +------------------+
-    | Bob Johnson      |
-    | Emma Brown       |
-    | Ryan Martinez    |
-    | Olivia Taylor    |
-    | David White      |
-    | Sophia Rodriguez |
-    +------------------+
-    6 rows in set (0.01 sec)
+    WITH student_list AS (
+            SELECT sc.courseId,s.studentId,s.studentName
+            FROM student_course sc
+            JOIN student s ON s.studentId=sc.studentId
+            ),
+        courses_with_grade (studentId,stdcourse_letter_grade,studentCount) AS (
+            SELECT
+                studentId,
+                stdcourse_letter_grade,
+                count(studentId) as studentCount
+            FROM
+                student_course
+            group by
+                studentId,stdcourse_letter_grade
+        ),
+        stdCount (studentId,studentIdCount) AS (
+            SELECT
+                studentId,
+                count(studentId) as studentIdCount
+            FROM
+                courses_with_grade
+            group by
+                studentId
+            having
+                count(studentId) = 1
+            )
+        SELECT distinct s.studentName,cg.stdcourse_letter_grade as Grade
+        FROM student_list s
+        JOIN courses_with_grade cg ON cg.studentId=s.studentId
+        JOIN stdCount sc ON sc.studentId=cg.studentId
+        WHERE cg.stdcourse_letter_grade is not null
+        +------------------+-------+
+        | studentName      | Grade |
+        +------------------+-------+
+        | Bob Johnson      | A     |
+        | Emma Brown       | B+    |
+        | Michael Davis    | A     |
+        | Ryan Martinez    | A     |
+        | Olivia Taylor    | A     |
+        | David White      | B+    |
+        | Sophia Rodriguez | A     |
+        +------------------+-------+
+        7 rows in set (0.01 sec)
+
 
 -- 27) Retrieve the list of courses that have the same number of enrolled students.
-    SELECT c.courseName,count(sc.courseId) as Total_Std_Enrolled
-    FROM course c
-    INNER JOIN student_course sc ON c.courseId = sc.courseId
-    GROUP BY c.courseName
-    HAVING Total_Std_Enrolled = (
-            SELECT count(DISTINCT studentId) as stdCount
-            FROM student_course
-            GROUP BY courseId
-            LIMIT 1
-        );
-    +--------------------+--------------------+
-    | courseName         | Total_Std_Enrolled |
-    +--------------------+--------------------+
-    | English Literature |                  2 |
-    | Calculus           |                  2 |
-    | World History      |                  2 |
-    | Art Appreciation   |                  2 |
-    +--------------------+--------------------+
-    4 rows in set (0.00 sec)
+    WITH course_enrollment_counts(courseId,enrolled_students_count) AS (
+            SELECT
+                courseId,count(studentId) AS enrolled_students_count
+            FROM
+                student_course
+            GROUP BY
+                courseId
+        )
+        SELECT
+            ce1.courseId,
+            ce2.courseId,
+            ce1.enrolled_students_count AS enrolled_students_count
+        FROM
+            course_enrollment_counts ce1
+            JOIN course_enrollment_counts ce2 ON ce1.enrolled_students_count = ce2.enrolled_students_count
+                AND ce1.courseId < ce2.courseId;
+    +----------+----------+-------------------------+
+    | courseId | courseId | enrolled_students_count |
+    +----------+----------+-------------------------+
+    |        1 |        2 |                       2 |
+    |        2 |        4 |                       2 |
+    |        1 |        4 |                       2 |
+    |        4 |        6 |                       2 |
+    |        2 |        6 |                       2 |
+    |        1 |        6 |                       2 |
+    |        3 |        7 |                       3 |
+    |        7 |        8 |                       3 |
+    |        3 |        8 |                       3 |
+    |        5 |        9 |                       1 |
+    |        9 |       10 |                       1 |
+    |        5 |       10 |                       1 |
+    +----------+----------+-------------------------+
+    12 rows in set (0.01 sec)
 
 -- 28) Retrieve the list of instructors who have taught all courses.
-    SELECT instructorName
-    FROM instructor i
-    WHERE instructorId IN (
-            SELECT i.instructorId
-            FROM instructor i
-            INNER JOIN course_instructor ci ON ci.instructorId=i.instructorId
-            INNER JOIN course c ON c.courseId=ci.courseId
-        )
-    +-----------------+
-    | instructorName  |
-    +-----------------+
-    | Prof. Smith     |
-    | Dr. Johnson     |
-    | Ms. Williams    |
-    | Mr. Brown       |
-    | Prof. Davis     |
-    | Dr. Martinez    |
-    | Ms. Taylor      |
-    | Mr. White       |
-    | Prof. Rodriguez |
-    | Dr. Wilson      |
-    +-----------------+
-    10 rows in set (0.02 sec)
-
+    WITH instuctor_list (instructorId,instructorName) AS(
+        SELECT instructorId,instructorName
+        FROM instructor i
+        WHERE instructorId IN (
+                SELECT i.instructorId
+                FROM instructor i
+                INNER JOIN course_instructor ci ON ci.instructorId=i.instructorId
+                INNER JOIN course c ON c.courseId=ci.courseId
+            )
+    ),
+    courses_taught_by_instructor(courseId,instructorId,courseName) AS (
+        SELECT c.courseId,ci.instructorId,courseName
+        FROM course c
+        JOIN course_instructor ci ON ci.courseId = c.courseId
+    )
+    SELECT il.instructorId,il.instructorName,ct.courseName
+    FROM instuctor_list il
+    JOIN courses_taught_by_instructor ct ON ct.instructorId=il.instructorId
+    +--------------+-----------------+--------------------+
+    | instructorId | instructorName  | courseName         |
+    +--------------+-----------------+--------------------+
+    |            1 | Prof. Smith     | English Literature |
+    |            1 | Prof. Smith     | Geography          |
+    |            2 | Dr. Johnson     | Calculus           |
+    |            2 | Dr. Johnson     | English Literature |
+    |            3 | Ms. Williams    | Biology            |
+    |            4 | Mr. Brown       | World History      |
+    |            4 | Mr. Brown       | Biology            |
+    |            5 | Prof. Davis     | Computer Science   |
+    |            6 | Dr. Martinez    | Art Appreciation   |
+    |            6 | Dr. Martinez    | Computer Science   |
+    |            7 | Ms. Taylor      | Music Theory       |
+    |            8 | Mr. White       | Physics            |
+    |            8 | Mr. White       | Music Theory       |
+    |            9 | Prof. Rodriguez | Geography          |
+    |           10 | Dr. Wilson      | Language Arts      |
+    +--------------+-----------------+--------------------+
+    15 rows in set (0.01 sec)
 
 -- 29) Retrieve the list of assignments that have been graded but not returned to the students.
     SELECT sa.assignmentId
@@ -577,54 +615,29 @@ select * from student_course
 
 -- 30) Retrieve the list of courses that have an average grade higher than the overall grade average.
     WITH course_overall_average_grade AS (
-        SELECT avg(stdcourse_numeric_grade) as over_all_grade
-        FROM student_course sc
+        SELECT studentId,courseId, avg(stdcourse_numeric_grade) as over_all_grade
+        FROM student_course
+        GROUP BY studentId,courseId
     ),
     average_grade AS (
-        SELECT avg(stdcourse_numeric_grade) as average_grade
+        SELECT sc.courseId,avg(stdcourse_numeric_grade) as avgGrade
         FROM student_course sc
         JOIN course c ON c.courseId=sc.courseId
         WHERE stdcourse_numeric_grade is not null
+        GROUP BY sc.courseId
     )
-select dept_name,min(salary), max(salary), avg(salary)
-from employee group by dept_name
+    SELECT c.courseName, over_all_grade, avgGrade
+    FROM course c
+    JOIN course_overall_average_grade co ON co.courseId=c.courseId
+    JOIN average_grade ag ON ag.courseId=c.courseId
+    WHERE ag.avgGrade > co.over_all_grade
 
-31) Retrieve the list of students who have submitted all assignments for a specific course.
-WITH course_assignments AS (
-    SELECT
-        ca.assignmentId
-    FROM
-        course_assignment ca
-    WHERE
-        ca.courseId = 1
-),
-assignment_count AS (
-    SELECT
-        COUNT(*) AS total_assignments
-    FROM
-        course_assignments
-),
-student_submissions AS (
-    SELECT
-        sa.studentId,
-        COUNT(sa.assignmentId) AS submitted_assignments
-    FROM
-        student_assignment sa
-        JOIN course_assignments ca ON sa.assignmentId = ca.assignmentId
-    GROUP BY
-        sa.studentId
-),
-students_fulfilled AS (
-    SELECT
-        ss.studentId
-    FROM
-        student_submissions ss
-        JOIN assignment_count ac ON ss.submitted_assignments = ac.total_assignments
-)
-SELECT
-    s.studentId,
-    s.studentName,
-    s.email
-FROM
-    students_fulfilled sf
-    JOIN student s ON sf.studentId = s.studentId;
+    +------------------+----------------+----------+
+    | courseName       | over_all_grade | avgGrade |
+    +------------------+----------------+----------+
+    | Music Theory     |        85.0000 |  90.0000 |
+    | Physics          |        40.0000 |  76.3333 |
+    | Biology          |        45.0000 |  68.5000 |
+    | Art Appreciation |        85.0000 |  86.5000 |
+    +------------------+----------------+----------+
+    4 rows in set (0.01 sec)
