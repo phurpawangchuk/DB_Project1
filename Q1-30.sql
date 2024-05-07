@@ -322,7 +322,6 @@
         +----------+---------------+
         3 rows in set (0.00 sec)
 
-
 -- 18) Retrieve the list of students who have the highest grade in a specific course.
     SELECT studentName, max(stdcourse_numeric_grade) as HighestGrade
     FROM student s
@@ -558,3 +557,55 @@ select * from student_course
     WHERE assignment_graded_date is not null and assignment_returned_date is null;
 
 -- 30) Retrieve the list of courses that have an average grade higher than the overall grade average.
+    WITH course_overall_average_grade AS (
+        SELECT avg(stdcourse_numeric_grade) as over_all_grade
+        FROM student_course sc
+    ),
+    average_grade AS (
+        SELECT avg(stdcourse_numeric_grade) as average_grade
+        FROM student_course sc
+        JOIN course c ON c.courseId=sc.courseId
+        WHERE stdcourse_numeric_grade is not null
+    )
+select dept_name,min(salary), max(salary), avg(salary)
+from employee group by dept_name
+
+31) Retrieve the list of students who have submitted all assignments for a specific course.
+WITH course_assignments AS (
+    SELECT
+        ca.assignmentId
+    FROM
+        course_assignment ca
+    WHERE
+        ca.courseId = 1
+),
+assignment_count AS (
+    SELECT
+        COUNT(*) AS total_assignments
+    FROM
+        course_assignments
+),
+student_submissions AS (
+    SELECT
+        sa.studentId,
+        COUNT(sa.assignmentId) AS submitted_assignments
+    FROM
+        student_assignment sa
+        JOIN course_assignments ca ON sa.assignmentId = ca.assignmentId
+    GROUP BY
+        sa.studentId
+),
+students_fulfilled AS (
+    SELECT
+        ss.studentId
+    FROM
+        student_submissions ss
+        JOIN assignment_count ac ON ss.submitted_assignments = ac.total_assignments
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    s.email
+FROM
+    students_fulfilled sf
+    JOIN student s ON sf.studentId = s.studentId;
