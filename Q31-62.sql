@@ -395,32 +395,553 @@ WHERE
     );
 
 -- 42) Retrieve the list of assignments that have the highest average grade.
+WITH assignment_grades AS (
+    SELECT
+        sa.assignmentId,
+        sa.assignment_letter_grade,
+        AVG(sa.assignment_numeric_grade) AS avg_grade
+    FROM
+        student_assignment sa
+    GROUP BY
+        sa.assignmentId,
+        sa.assignment_letter_grade
+)
+SELECT
+    ag.assignmentId,
+    a.assign_description,
+    a.assign_due_date,
+    ag.avg_grade,
+    ag.assignment_letter_grade
+FROM
+    assignment_grades ag
+    JOIN assignment a ON ag.assignmentId = a.assignmentId
+WHERE
+    ag.avg_grade = (
+        SELECT
+            MAX(avg_grade)
+        FROM
+            assignment_grades
+    );
+
 -- 43) Retrieve the list of students who have the highest overall grade across all courses.
+WITH student_total_grades AS (
+    SELECT
+        sc.studentId,
+        SUM(sc.stdcourse_numeric_grade) AS total_grade
+    FROM
+        student_course sc
+    GROUP BY
+        sc.studentId
+    HAVING
+        total_grade IS NOT NULL
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    stg.total_grade
+FROM
+    student_total_grades stg
+    JOIN student s ON stg.studentId = s.studentId
+WHERE
+    stg.total_grade = (
+        SELECT
+            MAX(total_grade)
+        FROM
+            student_total_grades
+    );
+
 -- 44) Retrieve the list of assignments that have not been graded yet.
+SELECT
+    a.assignmentId,
+    a.assign_description,
+    a.assign_due_date
+FROM
+    student_assignment sa
+    LEFT JOIN assignment a ON a.assignmentId = sa.assignmentId
+WHERE
+    sa.assignment_submission_date IS NULL
+    AND assignment_returned_date IS NULL
+    AND assignment_graded_date IS NULL;
+
 -- 45) Retrieve the list of courses that have not been assigned any assignments yet.
+SELECT
+    *
+FROM
+    course c
+WHERE
+    c.courseId NOT IN (
+        SELECT
+            courseId
+        FROM
+            course_assignment
+    );
+
 -- 46) Retrieve the list of students who have completed all assignments for a specific course.
+-- courses.
+WITH course_assignments AS (
+    SELECT
+        ca.assignmentId
+    FROM
+        course_assignment ca
+    WHERE
+        ca.courseId = 1
+),
+assignment_count AS (
+    SELECT
+        COUNT(*) AS total_assignments
+    FROM
+        course_assignments
+),
+student_submissions AS (
+    SELECT
+        sa.studentId,
+        COUNT(sa.assignmentId) AS submitted_assignments
+    FROM
+        student_assignment sa
+        JOIN course_assignments ca ON sa.assignmentId = ca.assignmentId
+    GROUP BY
+        sa.studentId
+),
+students_fulfilled AS (
+    SELECT
+        ss.studentId
+    FROM
+        student_submissions ss
+        JOIN assignment_count ac ON ss.submitted_assignments = ac.total_assignments
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    s.email
+FROM
+    students_fulfilled sf
+    JOIN student s ON sf.studentId = s.studentId;
+
 -- 47) Retrieve the list of students who have submitted all assignments but have not received a passing
 -- grade for a specific course.
+WITH course_assignments AS (
+    SELECT
+        ca.assignmentId
+    FROM
+        course_assignment ca
+    WHERE
+        ca.courseId = 1
+),
+assignment_count AS (
+    SELECT
+        COUNT(*) AS total_assignments
+    FROM
+        course_assignments
+),
+student_submissions AS (
+    SELECT
+        sa.studentId,
+        COUNT(sa.assignmentId) AS submitted_assignments
+    FROM
+        student_assignment sa
+        JOIN course_assignments ca ON sa.assignmentId = ca.assignmentId
+    GROUP BY
+        sa.studentId
+),
+students_failed_fulfilled AS (
+    SELECT
+        ss.studentId,
+        sc.stdcourse_numeric_grade,
+        sc.stdcourse_letter_grade
+    FROM
+        student_submissions ss
+        JOIN assignment_count ac ON ss.submitted_assignments = ac.total_assignments
+        JOIN student_course sc ON sc.studentId = ss.studentId
+    WHERE
+        sc.courseId = 1
+        AND sc.stdcourse_numeric_grade < 62
+        AND sc.stdcourse_letter_grade = 'F'
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    s.email,
+    sff.stdcourse_numeric_grade,
+    sff.stdcourse_letter_grade
+FROM
+    students_failed_fulfilled sff
+    JOIN student s ON sff.studentId = s.studentId;
+
 -- 48) Retrieve the list of courses that have the highest percentage of students who have received a
 -- passing grade.
+WITH total_students AS (
+    SELECT
+        courseId,
+        COUNT(*) AS total
+    FROM
+        student_course
+    GROUP BY
+        courseId
+),
+passed_students AS (
+    SELECT
+        sc.courseId,
+        COUNT(*) AS total_passed_students
+    FROM
+        student_course sc
+    WHERE
+        sc.stdcourse_numeric_grade >= 62
+        AND NOT sc.stdcourse_letter_grade = 'F'
+    GROUP BY
+        sc.courseId
+),
+pass_rates AS (
+    SELECT
+        ts.courseId,
+        c.courseName,
+        c.courseCode,
+        COALESCE(
+            CAST(ps.total_passed_students AS FLOAT) / ts.total,
+            0
+        ) AS pass_rate
+    FROM
+        total_students ts
+        LEFT JOIN passed_students ps ON ts.courseId = ps.courseId
+        JOIN course c ON c.courseId = ps.courseId
+    GROUP BY
+        ts.courseId
+)
+SELECT
+    pr.courseId,
+    c.courseCode,
+    c.courseName
+FROM
+    pass_rates pr
+    JOIN course c ON pr.courseId = c.courseId
+WHERE
+    pr.pass_rate = (
+        SELECT
+            MAX(pass_rate)
+        FROM
+            pass_rates
+    );
+
 -- 49) Retrieve the list of students who have submitted assignments late for a specific course.
+SELECT
+    sa.studentId,
+    s.studentName,
+    ca.courseId,
+    ca.assignmentId,
+    a.assign_due_date,
+    sa.assignment_submission_date
+FROM
+    student_assignment sa
+    JOIN assignment a ON a.assignmentId = sa.assignmentId
+    JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+    AND ca.courseId = 1
+    JOIN student s ON s.studentId = sa.studentId
+WHERE
+    a.assign_due_date < sa.assignment_submission_date
+    AND ca.courseId = 1;
+
 -- 50) Retrieve the list of courses that have the highest percentage of students who have dropped
 -- out.
+WITH students_dropped_list AS (
+    SELECT
+        sc.courseId,
+        COUNT(sc.is_active) AS drop_count
+    FROM
+        student_course sc
+    GROUP BY
+        sc.courseId
+)
+SELECT
+    sdl.courseId,
+    c.courseCode,
+    c.courseName,
+    sdl.drop_count
+FROM
+    students_dropped_list sdl
+    JOIN course c ON sdl.courseId = c.courseId
+WHERE
+    sdl.drop_count = (
+        SELECT
+            MAX(drop_count)
+        FROM
+            students_dropped_list
+    );
+
 -- 51) Retrieve the list of students who have not yet submitted any assignments for a specific
 -- course.
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+WHERE
+    s.studentId IN (
+        SELECT
+            studentId
+        FROM
+            student_course
+        WHERE
+            courseId = 1
+    )
+    AND s.studentId NOT IN (
+        SELECT
+            sa.studentId
+        FROM
+            student_assignment sa
+            JOIN course_assignment ca ON sa.assignmentId = ca.assignmentId
+        WHERE
+            ca.courseId = 1
+    );
+
 -- 52) Retrieve the list of students who have submitted at least one assignment for a specific
 -- course but have not completed all assignments.
+WITH assignment_count AS (
+    SELECT
+        ca.courseId,
+        COUNT(*) AS total_assignments
+    FROM
+        course_assignment ca
+    WHERE
+        ca.courseId = 1
+    GROUP BY
+        ca.courseId
+),
+student_submissions AS (
+    SELECT
+        sc.courseId,
+        sc.studentId,
+        COUNT(sa.assignmentId) AS submitted_assignments
+    FROM
+        student_course sc
+        LEFT JOIN student_assignment sa ON sc.studentId = sa.studentId
+        JOIN course_assignment ca ON sa.assignmentId = ca.assignmentId
+        AND ca.courseId = 1
+    GROUP BY
+        sc.studentId,
+        sc.courseId
+)
+SELECT
+    ss.studentId,
+    s.studentName
+FROM
+    student_submissions ss
+    JOIN assignment_count ac ON ac.courseId = ss.courseId
+    JOIN student s ON s.studentId = ss.studentId
+WHERE
+    ss.submitted_assignments >= 1
+    AND NOT ac.total_assignments = ss.submitted_assignments;
+
 -- 53) Retrieve the list of assignments that have received the highest average grade.
+WITH assignments_with_avg AS (
+    SELECT
+        sa.assignmentId,
+        sa.assignment_letter_grade,
+        AVG(sa.assignment_numeric_grade) AS avg_grade
+    FROM
+        student_assignment sa
+    GROUP BY
+        sa.assignmentId,
+        sa.assignment_letter_grade
+)
+SELECT
+    a.assignmentId,
+    a.assign_description,
+    a.assign_due_date,
+    awa.avg_grade,
+    awa.assignment_letter_grade
+FROM
+    assignments_with_avg awa
+    JOIN assignment a ON awa.assignmentId = a.assignmentId
+WHERE
+    awa.avg_grade = (
+        SELECT
+            MAX(avg_grade)
+        FROM
+            assignments_with_avg
+    );
+
 -- 54) Retrieve the list of students who have received the highest average grade across all
 -- courses.
+WITH students_with_avg AS (
+    SELECT
+        sc.studentId,
+        sc.stdcourse_letter_grade,
+        AVG(sc.stdcourse_numeric_grade) AS avg_grade
+    FROM
+        student_course sc
+    GROUP BY
+        sc.studentId,
+        sc.stdcourse_letter_grade
+)
+SELECT
+    s.studentId,
+    s.studentName,
+    swa.avg_grade,
+    swa.stdcourse_letter_grade
+FROM
+    students_with_avg swa
+    JOIN student s ON s.studentId = swa.studentId
+WHERE
+    swa.avg_grade = (
+        SELECT
+            MAX(avg_grade)
+        FROM
+            students_with_avg
+    );
+
 -- 55) Retrieve the list of courses that have the highest average grade.
+WITH courses_with_avg AS (
+    SELECT
+        sc.courseId,
+        sc.stdcourse_letter_grade,
+        AVG(sc.stdcourse_numeric_grade) AS avg_grade
+    FROM
+        student_course sc
+    GROUP BY
+        sc.courseId,
+        sc.stdcourse_letter_grade
+)
+SELECT
+    c.courseId,
+    c.courseCode,
+    c.courseName,
+    swa.avg_grade,
+    swa.stdcourse_letter_grade
+FROM
+    students_with_avg swa
+    JOIN course c ON c.courseId = swa.courseId
+WHERE
+    swa.avg_grade = (
+        SELECT
+            MAX(avg_grade)
+        FROM
+            students_with_avg
+    );
+
 -- 56) Retrieve the list of courses that have at least one student enrolled but no assignments
 -- have been created yet.
+WITH course_enrollees AS (
+    SELECT
+        sc.courseId,
+        COUNT(sc.studentId) AS student_count
+    FROM
+        student_course sc
+    GROUP BY
+        sc.courseId
+    HAVING
+        student_count >= 1
+)
+SELECT
+    c.courseId,
+    c.courseCode,
+    c.courseName
+FROM
+    course_enrollees ce
+    JOIN course c ON c.courseId = ce.courseId
+WHERE
+    ce.courseId NOT IN (
+        SELECT
+            courseId
+        FROM
+            course_assignment
+    );
+
 -- 57) Retrieve the list of courses that have at least one assignment created but no student has
 -- enrolled yet.
+SELECT
+    c.courseId,
+    c.courseCode,
+    c.courseName
+FROM
+    course c
+WHERE
+    c.courseId IN (
+        SELECT
+            ca.courseId
+        FROM
+            course_assignment ca
+        GROUP BY
+            ca.courseId
+    )
+    AND NOT EXISTS (
+        SELECT
+            1
+        FROM
+            student_course sc
+        WHERE
+            sc.courseId = c.courseId
+    );
+
 -- 58) Retrieve the list of students who have submitted all assignments for a specific course.
+-- Duplicate for 31
 -- 59) Retrieve the list of courses where the overall average grade is higher than the average
 -- grade of a specific student.
+SELECT
+    sc.courseId,
+    AVG(sc.stdcourse_numeric_grade) AS avg_grade
+FROM
+    student_course sc
+WHERE
+    avg_grade > (
+        SELECT
+            AVG(sc.stdcourse_numeric_grade)
+        FROM
+            student_course sc
+        WHERE
+            sc.studentId = 1
+    );
+
 -- 60) Retrieve the list of students who have not yet submitted any assignments for any course.
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+WHERE
+    s.studentId NOT IN (
+        SELECT
+            studentId
+        FROM
+            student_assignment
+    );
+
 -- 61) Retrieve the list of students who have completed all the courses they have enrolled in.
+SELECT
+    DISTINCT s.studentId,
+    s.studentName
+FROM
+    student_course sc
+    JOIN student s ON sc.studentId = s.studentId
+WHERE
+    NOT EXISTS (
+        SELECT
+            1
+        FROM
+            student_course sc
+        WHERE
+            sc.studentId = s.studentId
+            AND (
+                sc.stdcourse_numeric_grade IS NULL
+                OR sc.stdcourse_letter_grade = 'F'
+            )
+    );
+
 -- 62) Retrieve the list of courses where the average grade is lower than a specific threshold.
+WITH courses_with_avg AS (
+    SELECT
+        sc.courseId,
+        AVG(sc.stdcourse_numeric_grade) AS avg_grade
+    FROM
+        student_course sc
+    GROUP BY
+        sc.courseId
+    HAVING
+        avg_grade < 80
+)
+SELECT
+    c.courseId,
+    c.courseCode,
+    c.courseName,
+    cwa.avg_grade
+FROM
+    courses_with_avg cwa
+    JOIN course c ON cwa.courseId = c.courseId;
