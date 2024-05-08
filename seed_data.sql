@@ -433,3 +433,4 @@ VALUES
     (18, 6, 8),
     (19, 7, 9),
     (20, 7, 10);
+>>>>>>> 867b74e (Commit first part of project)
