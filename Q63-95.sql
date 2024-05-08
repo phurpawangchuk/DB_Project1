@@ -428,23 +428,164 @@ WHERE
     ats.Num_Assignments_On_Time = ass.Num_Assignments_Submitted;
 
 -- 82) Retrieve the list of students who have submitted late submissions for any assignment.
+SELECT
+    DISTINCT s.studentId,
+    s.studentName
+FROM
+    student s
+    INNER JOIN student_assignment sa ON sa.studentId = s.studentId
+    INNER JOIN assignment a ON a.assignmentId = sa.assignmentId
+WHERE
+    sa.assignment_submission_date > a.assign_due_date
+    OR sa.assignment_submission_date IS NULL;
+
+--COME BACK TO THIS--
 -- 83) Retrieve the list of courses that have the lowest average grade for a particular semester.
 -- 84) Retrieve the list of students who have not submitted any assignment for a particular
--- course.
+-- course (assuming courseID is 2).
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+    INNER JOIN student_course sc ON sc.studentId = s.studentId
+WHERE
+    courseId = 2
+    AND s.studentId NOT IN (
+        SELECT
+            DISTINCT sa.studentId
+        FROM
+            student_assignment sa
+            INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+        WHERE
+            ca.courseId = 2
+            AND sa.assignment_submission_date IS NOT NULL
+    );
+
 -- 85) Retrieve the list of courses where the highest grade is less than 90.
+WITH Course_Highest_Grade AS (
+    SELECT
+        courseId,
+        MAX(stdcourse_numeric_grade) AS Highest_Grade
+    FROM
+        student_course
+    GROUP BY
+        courseId
+)
+SELECT
+    c.courseId,
+    c.courseName,
+    chg.Highest_Grade
+FROM
+    course c
+    INNER JOIN Course_Highest_Grade chg ON chg.courseId = c.courseId
+WHERE
+    chg.Highest_Grade < 90;
+
+--COME BACK TO THIS--
 -- 86) Retrieve the list of students who have submitted all the assignments, but their average
 -- grade is less than 70.
 -- 87) Retrieve the list of courses that have at least one student with an average grade of 90 or
 -- above.
+WITH Student_Average AS (
+    SELECT
+        studentId,
+        AVG(stdcourse_numeric_grade) AS Average_Grade
+    FROM
+        student_course
+    GROUP BY
+        studentId
+    HAVING
+        AVG(stdcourse_numeric_grade) >= 90
+)
+SELECT
+    DISTINCT c.courseId,
+    c.courseName
+FROM
+    course c
+    INNER JOIN student_course sc ON sc.courseId = c.courseId
+WHERE
+    sc.studentId IN (
+        SELECT
+            studentId
+        FROM
+            Student_Average
+    );
+
+--COME BACK TO THIS--
 -- 88) Retrieve the list of students who have not submitted any assignments for any of their
 -- enrolled courses.
+--COME BACK TO THIS--
 -- 89) Retrieve the list of courses that have at least one student who has not submitted any
 -- assignments.
+--COME BACK TO THIS--
 -- 90) Retrieve the list of students who have submitted all the assignments for a particular
 -- course.
--- 91) Retrieve the list of assignments that have not been graded yet for a particular course.
+-- 91) Retrieve the list of assignments that have not been graded yet for a particular course (assuming courseId is 1).
+SELECT
+    a.assignmentId,
+    a.assign_description
+FROM
+    assignment a
+    INNER JOIN student_assignment sa ON sa.assignmentId = a.assignmentId
+    INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+WHERE
+    ca.courseId = 1
+    AND sa.assignment_graded_date IS NULL;
+
 -- 92) Retrieve the list of students who have not enrolled in any courses.
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+WHERE
+    s.studentId NOT IN (
+        SELECT
+            DISTINCT studentId
+        FROM
+            student_course
+    );
+
 -- 93) Retrieve the list of students who have submitted an assignment after the due date.
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+    INNER JOIN student_assignment sa ON sa.studentId = s.studentId
+    INNER JOIN assignment a ON a.assignmentId = sa.assignmentId
+WHERE
+    sa.assignment_submission_date > a.assign_due_date;
+
 -- 94) Retrieve the list of courses that have more than 50 enrolled students.
+WITH Enrolled_Students_Per_Course AS (
+    SELECT
+        courseId,
+        COUNT(*) AS Num_Students_Enrolled
+    FROM
+        student_course
+    GROUP BY
+        courseId
+)
+SELECT
+    c.courseId,
+    c.courseName,
+    espc.Num_Students_Enrolled
+FROM
+    course c
+    INNER JOIN Enrolled_Students_Per_Course espc ON espc.courseId = c.courseId
+WHERE
+    espc.Num_Students_Enrolled > 2;
+
 -- 95) Retrieve the list of students who have submitted an assignment for a particular course but
 -- have not received a grade yet.
+SELECT
+    DISTINCT s.studentId,
+    studentName
+FROM
+    student s
+    INNER JOIN student_assignment sa ON sa.studentId = s.studentId
+WHERE
+    assignment_submission_date IS NOT NULL
+    AND assignment_graded_date IS NULL;
