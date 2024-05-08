@@ -3,14 +3,15 @@
     FROM student s
     INNER JOIN student_course sc ON sc.studentId=s.studentId
     INNER JOIN course c ON c.courseId=sc.courseId
-    WHERE courseName='Computer Science'
-
-    +---------------+------------------+
-    | studentName   | courseName       |
-    +---------------+------------------+
-    | Michael Davis | Computer Science |
-    +---------------+------------------+
-    1 row in set (0.00 sec)
+    WHERE courseName='Physics'
+    +---------------+------------+
+    | studentName   | courseName |
+    +---------------+------------+
+    | John Doe      | Physics    |
+    | Sarah Wilson  | Physics    |
+    | Olivia Taylor | Physics    |
+    +---------------+------------+
+    3 rows in set (0.01 sec)
 
 -- 2) Retrieve the average grade of a specific assignment across all students.
     SELECT studentName,avg(assignment_numeric_grade) as averageGrade
@@ -47,7 +48,7 @@
     FROM course_instructor ci
     INNER JOIN course c ON c.courseId=ci.courseId
     INNER JOIN instructor i ON i.instructorId=ci.instructorId
-    WHERE c.courseId = 1;
+    WHERE c.courseName = 'English Literature';
 
     +----------------+--------------------+
     | instructorName | courseName         |
@@ -123,18 +124,15 @@
     |         1 |        7 |       85 |
     |         6 |        6 |       85 |
     |         2 |        2 |       85 |
-    |        11 |        1 |     NULL |
-    |        12 |        2 |     NULL |
-    |        13 |        3 |     NULL |
     +-----------+----------+----------+
-    20 rows in set (0.00 sec)
+    17 rows in set (0.00 sec)
 
 -- 8) Retrieve the list of all students who have not completed a specific assignment.
     SELECT studentName,sa.assignmentId
     FROM student s
     INNER JOIN student_assignment sa ON sa.studentId=s.studentId
     WHERE assignment_submission_date is NULL
-
+    +---------+---------+--------+
     | studentName | assignmentId |
     +-------------+--------------+
     | John Doe    |           11 |
@@ -291,7 +289,7 @@
     10 rows in set (0.01 sec)
 
 -- 16) Retrieve the list of students who have a grade of A in a specific course.
-    SELECT studentName,stdcourse_letter_grade as Grade
+    SELECT studentName,sc.courseId,stdcourse_letter_grade as Grade
     FROM student s
     INNER JOIN student_course sc ON sc.studentId=s.studentId
     INNER JOIN course c ON c.courseId=sc.courseId
