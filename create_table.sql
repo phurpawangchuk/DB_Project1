@@ -51,6 +51,7 @@ CREATE TABLE student_course (
     stdcourse_numeric_grade int,
     stdcourse_letter_grade varchar(2),
     is_active boolean,
+    semester int,
     PRIMARY KEY(studentId, courseId),
     FOREIGN KEY(studentId) REFERENCES student(studentId),
     FOREIGN KEY(courseId) REFERENCES course(courseId)
