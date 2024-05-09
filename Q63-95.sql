@@ -144,9 +144,85 @@ WHERE
             MONTH(assignment_submission_date) = MONTH(CURDATE() - INTERVAL 1 MONTH)
     );
 
---COME BACK TO THIS---
 -- 68) Retrieve the list of courses where the percentage of students who have submitted all the
--- assignments is higher than a specific threshold.
+-- assignments is higher than a specific threshold (49%).
+WITH Assignments_Required AS (
+    SELECT
+        sc.studentId,
+        sc.courseId,
+        COUNT(*) AS Num_Assignments_Required
+    FROM
+        student_course sc
+        INNER JOIN course_assignment ca ON ca.courseId = sc.courseId
+    GROUP BY
+        sc.studentId,
+        sc.courseId
+),
+Assignments_Submitted AS(
+    SELECT
+        sa.studentId,
+        ca.courseId,
+        COUNT(*) AS Num_Assignments_Submitted
+    FROM
+        student_assignment sa
+        INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+    WHERE
+        sa.assignment_submission_date IS NOT NULL
+    GROUP BY
+        sa.studentId,
+        ca.courseId
+),
+Joined_Required_Submitted AS (
+    SELECT
+        ar.studentId,
+        ar.courseId,
+        ar.Num_Assignments_Required,
+        ass.Num_Assignments_Submitted
+    FROM
+        Assignments_Required ar
+        LEFT JOIN Assignments_Submitted ass ON ass.studentId = ar.studentId
+        AND ass.courseId = ar.courseId
+),
+Total_Students_Per_Course AS (
+    SELECT
+        jrs.courseId,
+        COUNT(*) AS Total_Enrolled_Students
+    FROM
+        Joined_Required_Submitted jrs
+    GROUP BY
+        jrs.courseId
+),
+Total_Students_Submitted_Per_Course AS (
+    SELECT
+        jrs.courseId,
+        COUNT(*) AS Total_Enrolled_Students_Who_Submitted_All
+    FROM
+        Joined_Required_Submitted jrs
+    WHERE
+        jrs.Num_Assignments_Required = jrs.Num_Assignments_Submitted
+    GROUP BY
+        jrs.courseId
+),
+Total_Enrolled_AND_Total_Submitted AS (
+    SELECT
+        tspc.courseId,
+        tspc.Total_Enrolled_Students,
+        tsspc.Total_Enrolled_Students_Who_Submitted_All
+    FROM
+        Total_Students_Per_Course tspc
+        LEFT JOIN Total_Students_Submitted_Per_Course tsspc ON tsspc.courseId = tspc.courseId
+)
+SELECT
+    c.courseId,
+    c.courseName
+FROM
+    course c
+    INNER JOIN Total_Enrolled_AND_Total_Submitted teats ON teats.courseId = c.courseId
+WHERE
+    (
+        teats.Total_Enrolled_Students_Who_Submitted_All / teats.Total_Enrolled_Students * 100
+    ) > 49;
+
 -- 69) Retrieve the list of students who have enrolled in a course but have not submitted any
 -- assignments.
 SELECT
@@ -163,9 +239,62 @@ WHERE
             student_assignment
     );
 
---COME BACK TO THIS---
 -- 70) Retrieve the list of courses where the percentage of students who have submitted at least
--- one assignment is lower than a specific threshold.
+-- one assignment is lower than a specific threshold. (49%).
+WITH Assignments_Submitted AS(
+    SELECT
+        sa.studentId,
+        ca.courseId,
+        COUNT(*) AS Num_Assignments_Submitted
+    FROM
+        student_assignment sa
+        INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+    WHERE
+        sa.assignment_submission_date IS NOT NULL
+    GROUP BY
+        sa.studentId,
+        ca.courseId
+),
+Total_Students_Per_Course AS (
+    SELECT
+        sc.courseId,
+        COUNT(*) AS Total_Enrolled_Students
+    FROM
+        student_course sc
+    GROUP BY
+        sc.courseId
+),
+Course_With_Students_Submitted_At_Least_One AS (
+    SELECT
+        ass.courseId,
+        COUNT(*) AS Num_Students_Who_Submitted_At_Least_One
+    FROM
+        Assignments_Submitted ass
+    WHERE
+        ass.Num_Assignments_Submitted >= 1
+    GROUP BY
+        ass.courseId
+),
+Total_Enrolled_AND_Total_Submitted_At_Least_One AS (
+    SELECT
+        tspc.courseId,
+        tspc.Total_Enrolled_Students,
+        cswssato.Num_Students_Who_Submitted_At_Least_One
+    FROM
+        Total_Students_Per_Course tspc
+        LEFT JOIN Course_With_Students_Submitted_At_Least_One cswssato ON cswssato.courseId = tspc.courseId
+)
+SELECT
+    c.courseId,
+    c.courseName
+FROM
+    course c
+    INNER JOIN Total_Enrolled_AND_Total_Submitted_At_Least_One teatsalo ON teatsalo.courseId = c.courseId
+WHERE
+    (
+        teatsalo.Num_Students_Who_Submitted_At_Least_One / teatsalo.Total_Enrolled_Students * 100
+    ) < 49;
+
 -- 71) Retrieve the list of students who have submitted an assignment after the due date.
 SELECT
     s.studentId,
@@ -439,8 +568,32 @@ WHERE
     sa.assignment_submission_date > a.assign_due_date
     OR sa.assignment_submission_date IS NULL;
 
---COME BACK TO THIS--
--- 83) Retrieve the list of courses that have the lowest average grade for a particular semester.
+-- 83) Retrieve the list of courses that have the lowest average grade for a particular semester (assuming this is semester 1).
+WITH Average_Grade_For_Semester AS (
+    SELECT
+        courseId,
+        AVG(stdcourse_numeric_grade) AS Average_Grade_For_Sem
+    FROM
+        student_course
+    WHERE
+        semester = 1
+    GROUP BY
+        courseId
+)
+SELECT
+    agfs.courseId,
+    c.courseName
+FROM
+    course c
+    INNER JOIN Average_Grade_For_Semester agfs ON agfs.courseId = c.courseId
+WHERE
+    agfs.Average_Grade_For_Sem = (
+        SELECT
+            MIN(Average_Grade_For_Sem)
+        FROM
+            Average_Grade_For_Semester
+    );
+
 -- 84) Retrieve the list of students who have not submitted any assignment for a particular
 -- course (assuming courseID is 2).
 SELECT
@@ -482,9 +635,43 @@ FROM
 WHERE
     chg.Highest_Grade < 90;
 
---COME BACK TO THIS--
 -- 86) Retrieve the list of students who have submitted all the assignments, but their average
 -- grade is less than 70.
+WITH All_Assignments_Submitted AS (
+    SELECT
+        sa.studentId
+    FROM
+        student_assignment sa
+        JOIN course_assignment ca ON sa.assignmentId = ca.assignmentId
+    GROUP BY
+        sa.studentId
+    HAVING
+        COUNT(DISTINCT ca.assignmentId) = (
+            SELECT
+                COUNT(DISTINCT assignmentId)
+            FROM
+                course_assignment
+        )
+),
+Student_Average_Grades AS (
+    SELECT
+        studentId,
+        AVG(assignment_numeric_grade) AS avgGrade
+    FROM
+        student_assignment
+    GROUP BY
+        studentId
+    HAVING
+        AVG(assignment_numeric_grade) < 70
+)
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+    JOIN All_Assignments_Submitted aas ON s.studentId = aas.studentId
+    JOIN Student_Average_Grades sag ON s.studentId = sag.studentId;
+
 -- 87) Retrieve the list of courses that have at least one student with an average grade of 90 or
 -- above.
 WITH Student_Average AS (
@@ -512,15 +699,114 @@ WHERE
             Student_Average
     );
 
---COME BACK TO THIS--
 -- 88) Retrieve the list of students who have not submitted any assignments for any of their
 -- enrolled courses.
---COME BACK TO THIS--
+WITH Assignments_Submitted AS (
+    SELECT
+        sa.studentId,
+        ca.courseId,
+        COUNT(*) AS Num_Assignments_Submitted
+    FROM
+        student_assignment sa
+        INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+    WHERE
+        sa.assignment_submission_date IS NOT NULL
+    GROUP BY
+        sa.studentId,
+        ca.courseId
+),
+Total_Assignments_Per_Enrolled_Student AS (
+    SELECT
+        s.studentId,
+        SUM(ass.Num_Assignments_Submitted) AS Total_Assignments_Submitted_Per_Student
+    FROM
+        student s
+        INNER JOIN student_course sc ON sc.studentId = s.studentId
+        LEFT JOIN Assignments_Submitted ass ON ass.studentId = sc.studentId
+        AND ass.courseId = sc.courseId
+    GROUP BY
+        s.studentId
+)
+SELECT
+    tapes.studentId,
+    s.studentName
+FROM
+    student s
+    INNER JOIN Total_Assignments_Per_Enrolled_Student tapes ON tapes.studentId = s.studentId
+WHERE
+    tapes.Total_Assignments_Submitted_Per_Student IS NULL;
+
 -- 89) Retrieve the list of courses that have at least one student who has not submitted any
 -- assignments.
---COME BACK TO THIS--
+WITH Assignments_Submitted AS (
+    SELECT
+        sa.studentId,
+        ca.courseId,
+        COUNT(*) AS Num_Assignments_Submitted
+    FROM
+        student_assignment sa
+        INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+    WHERE
+        sa.assignment_submission_date IS NOT NULL
+    GROUP BY
+        sa.studentId,
+        ca.courseId
+),
+Num_Assignments_Per_Student_Per_Course AS (
+    SELECT
+        s.studentId,
+        sc.courseId,
+        ass.Num_Assignments_Submitted
+    FROM
+        student s
+        INNER JOIN student_course sc ON sc.studentId = s.studentId
+        LEFT JOIN Assignments_Submitted ass ON ass.studentId = sc.studentId
+        AND ass.courseId = sc.courseId
+)
+SELECT
+    DISTINCT nampspc.courseId,
+    c.courseName
+FROM
+    course c
+    INNER JOIN Num_Assignments_Per_Student_Per_Course nampspc ON nampspc.courseId = c.courseId
+WHERE
+    nampspc.Num_Assignments_Submitted IS NULL;
+
 -- 90) Retrieve the list of students who have submitted all the assignments for a particular
--- course.
+-- course(assuming courseId is 1).
+WITH Num_Submission_Of_Student_For_Course AS (
+    SELECT
+        sa.studentId,
+        ca.courseId,
+        COUNT(*) AS Num_Submissions_For_Course
+    FROM
+        student_assignment sa
+        INNER JOIN course_assignment ca ON ca.assignmentId = sa.assignmentId
+    WHERE
+        ca.courseId = 1
+        AND sa.assignment_submission_date IS NOT NULL
+    GROUP BY
+        sa.studentId,
+        ca.courseId
+)
+SELECT
+    s.studentId,
+    s.studentName
+FROM
+    student s
+    INNER JOIN Num_Submission_Of_Student_For_Course nsosfc ON nsosfc.studentId = s.studentId
+WHERE
+    nsosfc.Num_Submissions_For_Course = (
+        SELECT
+            COUNT(*)
+        FROM
+            course_assignment
+        WHERE
+            courseId = 1
+        GROUP BY
+            courseId
+    );
+
 -- 91) Retrieve the list of assignments that have not been graded yet for a particular course (assuming courseId is 1).
 SELECT
     a.assignmentId,
